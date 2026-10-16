@@ -26,10 +26,11 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Update Discord status
+      - name: Update Discord status and create rules
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           CHANNEL_ID: "1560574790018801665"
+          RULES_CHANNEL_ID: "1560566171059884093"
           SERVER_ADDRESS: "breezes.play.hosting:25811"
         run: |
           node --input-type=module <<'NODE'
@@ -37,6 +38,7 @@ jobs:
 
           const token = process.env.DISCORD_BOT_TOKEN;
           const channelId = process.env.CHANNEL_ID;
+          const rulesChannelId = process.env.RULES_CHANNEL_ID;
           const address = process.env.SERVER_ADDRESS;
 
           if (!token) throw new Error('Missing DISCORD_BOT_TOKEN secret.');
@@ -63,6 +65,7 @@ jobs:
             return response.status === 204 ? null : response.json();
           };
 
+          // Update the Minecraft server status message.
           let online = false;
           let checkFailed = false;
           let players = 0;
@@ -94,8 +97,8 @@ jobs:
             ? '⚠️ Status check unavailable'
             : online ? '🟢 Online' : '🔴 Offline';
 
-          const embed = {
-            title: '🌍 BreezeS Minecraft Server',
+          const statusEmbed = {
+            title: '🌍 Breezes Minecraft Server',
             color: checkFailed ? 0xF1C40F : online ? 0x2ECC71 : 0xE74C3C,
             description: `**Status:** ${status}`,
             fields: [
@@ -129,32 +132,68 @@ jobs:
             messageId = (await readFile('message_id.txt', 'utf8')).trim();
           } catch {}
 
-          let message;
-
           if (messageId) {
-            message = await discord(
+            const message = await discord(
               'PATCH',
               `/channels/${channelId}/messages/${messageId}`,
-              { embeds: [embed] }
+              { embeds: [statusEmbed] }
             );
-            console.log('Updated existing status message:', message.id);
+            console.log('Updated status message:', message.id);
           } else {
-            message = await discord(
+            const message = await discord(
               'POST',
               `/channels/${channelId}/messages`,
-              { embeds: [embed] }
+              { embeds: [statusEmbed] }
             );
             await writeFile('message_id.txt', message.id + '\n');
             console.log('Created status message:', message.id);
           }
+
+          // Create the rules embed only once.
+          let rulesMessageId = '';
+          try {
+            rulesMessageId = (await readFile('rules_message_id.txt', 'utf8')).trim();
+          } catch {}
+
+          if (!rulesMessageId) {
+            const rulesEmbed = {
+              title: 'Breezes SMP | Server Rules',
+              color: 0xA18AF2,
+              description: [
+                '**📜 1. RESPECT**',
+                'No harassment, hate speech, doxxing, threats, or spam.',
+                '',
+                '**⚔️ 2. SURVIVAL**',
+                'PvP, raiding, stealing, and griefing are allowed.',
+                '',
+                '**🛠️ 3. NO CHEATING**',
+                'No hacked clients, X-ray, combat cheats, or unfair exploits.',
+                '',
+                '━━━━━━━━━━━━━━━━━━━━',
+                'By playing on Breezes SMP, you agree to these rules.'
+              ].join('\n'),
+              footer: { text: 'Breezes SMP • Survive. Build. Compete.' }
+            };
+
+            const rulesMessage = await discord(
+              'POST',
+              `/channels/${rulesChannelId}/messages`,
+              { embeds: [rulesEmbed] }
+            );
+
+            await writeFile('rules_message_id.txt', rulesMessage.id + '\n');
+            console.log('Created rules message:', rulesMessage.id);
+          } else {
+            console.log('Rules message already exists; leaving it unchanged.');
+          }
           NODE
 
-      - name: Save message ID for future updates
+      - name: Save message IDs for future runs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add message_id.txt
+          git add message_id.txt rules_message_id.txt
           if ! git diff --cached --quiet; then
-            git commit -m "Save Discord status message ID"
+            git commit -m "Save Discord message IDs"
             git push
           fi
