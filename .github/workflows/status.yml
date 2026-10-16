@@ -44,17 +44,14 @@ jobs:
           if (!token) throw new Error('Missing DISCORD_BOT_TOKEN secret.');
 
           const discord = async (method, path, body) => {
-            const response = await fetch(
-              `https://discord.com/api/v10${path}`,
-              {
-                method,
-                headers: {
-                  Authorization: `Bot ${token}`,
-                  'Content-Type': 'application/json'
-                },
-                ...(body ? { body: JSON.stringify(body) } : {})
-              }
-            );
+            const response = await fetch(`https://discord.com/api/v10${path}`, {
+              method,
+              headers: {
+                Authorization: `Bot ${token}`,
+                'Content-Type': 'application/json'
+              },
+              ...(body ? { body: JSON.stringify(body) } : {})
+            });
 
             if (!response.ok) {
               throw new Error(
@@ -62,10 +59,10 @@ jobs:
               );
             }
 
-            return response.status === 204 ? null : response.json();
+            return response.json();
           };
 
-          // Update the Minecraft server status message.
+          // Check the Minecraft server.
           let online = false;
           let checkFailed = false;
           let players = 0;
@@ -77,9 +74,7 @@ jobs:
               { signal: AbortSignal.timeout(15000) }
             );
 
-            if (!response.ok) {
-              throw new Error(`Status service returned ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`Status service returned ${response.status}`);
 
             const data = await response.json();
             online = data.online === true;
@@ -107,49 +102,48 @@ jobs:
                 value: checkFailed ? 'Unknown' : `${players}/${maxPlayers}`,
                 inline: true
               },
-              {
-                name: '☕ Java Edition',
-                value: '1.21.11',
-                inline: true
-              },
-              {
-                name: '📱 Bedrock Crossplay',
-                value: 'Supported via Geyser',
-                inline: true
-              },
-              {
-                name: '🔗 Server Address',
-                value: `\`${address}\``,
-                inline: false
-              }
+              { name: '☕ Java Edition', value: '1.21.11', inline: true },
+              { name: '📱 Bedrock Crossplay', value: 'Supported via Geyser', inline: true },
+              { name: '🔗 Server Address', value: `\`${address}\``, inline: false }
             ],
             footer: { text: 'Automatically updated every 5 minutes' },
             timestamp: new Date().toISOString()
           };
 
+          // Update the saved status message, or recreate it if deleted.
           let messageId = '';
           try {
             messageId = (await readFile('message_id.txt', 'utf8')).trim();
           } catch {}
 
+          let statusMessage;
+
           if (messageId) {
-            const message = await discord(
-              'PATCH',
-              `/channels/${channelId}/messages/${messageId}`,
-              { embeds: [statusEmbed] }
-            );
-            console.log('Updated status message:', message.id);
-          } else {
-            const message = await discord(
+            try {
+              statusMessage = await discord(
+                'PATCH',
+                `/channels/${channelId}/messages/${messageId}`,
+                { embeds: [statusEmbed] }
+              );
+              console.log('Updated status message:', statusMessage.id);
+            } catch (error) {
+              if (!error.message.includes('404')) throw error;
+
+              console.log('Old status message not found; creating a replacement.');
+            }
+          }
+
+          if (!statusMessage) {
+            statusMessage = await discord(
               'POST',
               `/channels/${channelId}/messages`,
               { embeds: [statusEmbed] }
             );
-            await writeFile('message_id.txt', message.id + '\n');
-            console.log('Created status message:', message.id);
+            await writeFile('message_id.txt', statusMessage.id + '\n');
+            console.log('Created status message:', statusMessage.id);
           }
 
-          // Create the rules embed only once.
+          // Create the rules embed only if no ID has been saved.
           let rulesMessageId = '';
           try {
             rulesMessageId = (await readFile('rules_message_id.txt', 'utf8')).trim();
@@ -160,13 +154,13 @@ jobs:
               title: 'Breezes SMP | Server Rules',
               color: 0xA18AF2,
               description: [
-                '**📜 1. RESPECT**',
+                '**📜 1. Be Honourable**',
                 'No harassment, hate speech, doxxing, threats, or spam.',
                 '',
-                '**⚔️ 2. SURVIVAL**',
+                '**⚔️ 2. Be Absurd**',
                 'PvP, raiding, stealing, and griefing are allowed.',
                 '',
-                '**🛠️ 3. NO CHEATING**',
+                '**🛠️ 3. No Cheating**',
                 'No hacked clients, X-ray, combat cheats, or unfair exploits.',
                 '',
                 '━━━━━━━━━━━━━━━━━━━━',
@@ -184,10 +178,9 @@ jobs:
             await writeFile('rules_message_id.txt', rulesMessage.id + '\n');
             console.log('Created rules message:', rulesMessage.id);
           } else {
-            console.log('Rules message already exists; leaving it unchanged.');
+            console.log('Rules message ID already saved; skipping creation.');
           }
           NODE
-
 
       - name: Save message IDs for future runs
         run: |
@@ -199,4 +192,3 @@ jobs:
             git pull --rebase origin main
             git push origin HEAD:main
           fi
-
