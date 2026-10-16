@@ -188,6 +188,7 @@ jobs:
           }
           NODE
 
+
       - name: Save message IDs for future runs
         run: |
           git config user.name "github-actions[bot]"
@@ -195,5 +196,7 @@ jobs:
           git add message_id.txt rules_message_id.txt
           if ! git diff --cached --quiet; then
             git commit -m "Save Discord message IDs"
-            git push
+            git pull --rebase origin main
+            git push origin HEAD:main
           fi
+
