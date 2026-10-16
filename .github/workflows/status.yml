@@ -41,22 +41,29 @@ jobs:
           const rulesChannelId = process.env.RULES_CHANNEL_ID;
           const address = process.env.SERVER_ADDRESS;
 
-          if (!token) throw new Error('Missing DISCORD_BOT_TOKEN secret.');
+          if (!token) {
+            throw new Error('Missing DISCORD_BOT_TOKEN secret.');
+          }
 
           const discord = async (method, path, body) => {
-            const response = await fetch(`https://discord.com/api/v10${path}`, {
-              method,
-              headers: {
-                Authorization: `Bot ${token}`,
-                'Content-Type': 'application/json'
-              },
-              ...(body ? { body: JSON.stringify(body) } : {})
-            });
+            const response = await fetch(
+              `https://discord.com/api/v10${path}`,
+              {
+                method,
+                headers: {
+                  Authorization: `Bot ${token}`,
+                  'Content-Type': 'application/json'
+                },
+                ...(body ? { body: JSON.stringify(body) } : {})
+              }
+            );
 
             if (!response.ok) {
-              throw new Error(
+              const error = new Error(
                 `Discord API error: ${response.status} ${await response.text()}`
               );
+              error.status = response.status;
+              throw error;
             }
 
             return response.json();
@@ -74,7 +81,11 @@ jobs:
               { signal: AbortSignal.timeout(15000) }
             );
 
-            if (!response.ok) throw new Error(`Status service returned ${response.status}`);
+            if (!response.ok) {
+              throw new Error(
+                `Status service returned ${response.status}`
+              );
+            }
 
             const data = await response.json();
             online = data.online === true;
@@ -85,35 +96,63 @@ jobs:
             }
           } catch (error) {
             checkFailed = true;
-            console.error('Could not check Minecraft server:', error.message);
+            console.error(
+              'Could not check Minecraft server:',
+              error.message
+            );
           }
 
           const status = checkFailed
             ? '⚠️ Status check unavailable'
-            : online ? '🟢 Online' : '🔴 Offline';
+            : online
+              ? '🟢 Online'
+              : '🔴 Offline';
 
           const statusEmbed = {
             title: '🌍 Breezes Minecraft Server',
-            color: checkFailed ? 0xF1C40F : online ? 0x2ECC71 : 0xE74C3C,
+            color: checkFailed
+              ? 0xF1C40F
+              : online
+                ? 0x2ECC71
+                : 0xE74C3C,
             description: `**Status:** ${status}`,
             fields: [
               {
                 name: '👥 Players',
-                value: checkFailed ? 'Unknown' : `${players}/${maxPlayers}`,
+                value: checkFailed
+                  ? 'Unknown'
+                  : `${players}/${maxPlayers}`,
                 inline: true
               },
-              { name: '☕ Java Edition', value: '1.21.11', inline: true },
-              { name: '📱 Bedrock Crossplay', value: 'Supported via Geyser', inline: true },
-              { name: '🔗 Server Address', value: `\`${address}\``, inline: false }
+              {
+                name: '☕ Java Edition',
+                value: '1.21.11',
+                inline: true
+              },
+              {
+                name: '📱 Bedrock Crossplay',
+                value: 'Supported via Geyser',
+                inline: true
+              },
+              {
+                name: '🔗 Server Address',
+                value: `\`${address}\``,
+                inline: false
+              }
             ],
-            footer: { text: 'Automatically updated every 5 minutes' },
+            footer: {
+              text: 'Automatically updated every 5 minutes'
+            },
             timestamp: new Date().toISOString()
           };
 
-          // Update the saved status message, or recreate it if deleted.
+          // Update the status message, or replace it if it was deleted.
           let messageId = '';
+
           try {
-            messageId = (await readFile('message_id.txt', 'utf8')).trim();
+            messageId = (
+              await readFile('message_id.txt', 'utf8')
+            ).trim();
           } catch {}
 
           let statusMessage;
@@ -125,11 +164,19 @@ jobs:
                 `/channels/${channelId}/messages/${messageId}`,
                 { embeds: [statusEmbed] }
               );
-              console.log('Updated status message:', statusMessage.id);
-            } catch (error) {
-              if (!error.message.includes('404')) throw error;
 
-              console.log('Old status message not found; creating a replacement.');
+              console.log(
+                'Updated status message:',
+                statusMessage.id
+              );
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+
+              console.log(
+                'Old status message not found; creating a replacement.'
+              );
             }
           }
 
@@ -139,14 +186,25 @@ jobs:
               `/channels/${channelId}/messages`,
               { embeds: [statusEmbed] }
             );
-            await writeFile('message_id.txt', statusMessage.id + '\n');
-            console.log('Created status message:', statusMessage.id);
+
+            await writeFile(
+              'message_id.txt',
+              statusMessage.id + '\n'
+            );
+
+            console.log(
+              'Created status message:',
+              statusMessage.id
+            );
           }
 
-          // Create the rules embed only if no ID has been saved.
+          // Create the rules embed if no rules message ID is saved.
           let rulesMessageId = '';
+
           try {
-            rulesMessageId = (await readFile('rules_message_id.txt', 'utf8')).trim();
+            rulesMessageId = (
+              await readFile('rules_message_id.txt', 'utf8')
+            ).trim();
           } catch {}
 
           if (!rulesMessageId) {
@@ -166,7 +224,9 @@ jobs:
                 '━━━━━━━━━━━━━━━━━━━━',
                 'By playing on Breezes SMP, you agree to these rules.'
               ].join('\n'),
-              footer: { text: 'Breezes SMP • Survive. Build. Compete.' }
+              footer: {
+                text: 'Breezes SMP.'
+              }
             };
 
             const rulesMessage = await discord(
@@ -175,10 +235,19 @@ jobs:
               { embeds: [rulesEmbed] }
             );
 
-            await writeFile('rules_message_id.txt', rulesMessage.id + '\n');
-            console.log('Created rules message:', rulesMessage.id);
+            await writeFile(
+              'rules_message_id.txt',
+              rulesMessage.id + '\n'
+            );
+
+            console.log(
+              'Created rules message:',
+              rulesMessage.id
+            );
           } else {
-            console.log('Rules message ID already saved; skipping creation.');
+            console.log(
+              'Rules message ID already saved; skipping creation.'
+            );
           }
           NODE
 
@@ -186,9 +255,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add message_id.txt rules_message_id.txt
+
           if ! git diff --cached --quiet; then
             git commit -m "Save Discord message IDs"
+
             git pull --rebase origin main
+
             git push origin HEAD:main
           fi
