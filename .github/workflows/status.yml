@@ -3,7 +3,7 @@ name: Minecraft Discord Status
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "2/5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -108,6 +108,7 @@ jobs:
               ? '🟢 Online'
               : '🔴 Offline';
 
+          // Status embed (no automatic-update footer).
           const statusEmbed = {
             title: '🌍 Breezes Minecraft Server',
             color: checkFailed
@@ -140,13 +141,10 @@ jobs:
                 inline: false
               }
             ],
-            footer: {
-              text: 'Automatically updated every 5 minutes'
-            },
             timestamp: new Date().toISOString()
           };
 
-          // Update the status message, or replace it if it was deleted.
+          // Update the status message, or replace it if deleted.
           let messageId = '';
 
           try {
@@ -198,7 +196,7 @@ jobs:
             );
           }
 
-          // Create the rules embed if no rules message ID is saved.
+          // Create the rules embed only if no ID is saved.
           let rulesMessageId = '';
 
           try {
@@ -260,8 +258,6 @@ jobs:
 
           if ! git diff --cached --quiet; then
             git commit -m "Save Discord message IDs"
-
             git pull --rebase origin main
-
             git push origin HEAD:main
           fi
