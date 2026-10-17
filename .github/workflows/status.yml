@@ -31,7 +31,7 @@ jobs:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           CHANNEL_ID: "1560574790018801665"
           RULES_CHANNEL_ID: "1560566171059884093"
-          SERVER_ADDRESS: "breezes.play.hosting:25811"
+          SERVER_ADDRESS: "breezes.play.hosting:25734"
         run: |
           node --input-type=module <<'NODE'
           import { readFile, writeFile } from 'node:fs/promises';
