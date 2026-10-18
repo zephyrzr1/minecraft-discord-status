@@ -147,7 +147,7 @@ jobs:
                 value: [
                   'This embed does not display live server status or player counts.',
                   '',
-                  'Check **Breeze Helper’s profile/status** to see whether the server is online and who is currently playing.'
+                  'Check **Breeze Helper’s profile/status** to see whether the server is online and who is currently playing. If the bot is offline, the server is offline. If its online, server is online.'
                 ].join('\n'),
                 inline: false
               }
