@@ -1,9 +1,7 @@
 
-name: Minecraft Discord Status
+name: Breezes SMP Server Information
 
 on:
-  schedule:
-    - cron: "7/5 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -14,7 +12,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  update-status:
+  update-info:
     runs-on: ubuntu-latest
 
     steps:
@@ -26,12 +24,11 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Update Discord status and create rules
+      - name: Update server information and preserve rules
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           CHANNEL_ID: "1560574790018801665"
           RULES_CHANNEL_ID: "1560566171059884093"
-          SERVER_ADDRESS: "breezes.play.hosting:25734"
         run: |
           node --input-type=module <<'NODE'
           import { readFile, writeFile } from 'node:fs/promises';
@@ -39,7 +36,6 @@ jobs:
           const token = process.env.DISCORD_BOT_TOKEN;
           const channelId = process.env.CHANNEL_ID;
           const rulesChannelId = process.env.RULES_CHANNEL_ID;
-          const address = process.env.SERVER_ADDRESS;
 
           if (!token) {
             throw new Error('Missing DISCORD_BOT_TOKEN secret.');
@@ -69,82 +65,100 @@ jobs:
             return response.json();
           };
 
-          // Check the Minecraft server.
-          let online = false;
-          let checkFailed = false;
-          let players = 0;
-          let maxPlayers = '?';
-
-          try {
-            const response = await fetch(
-              `https://api.mcsrvstat.us/3/${address}`,
-              { signal: AbortSignal.timeout(15000) }
-            );
-
-            if (!response.ok) {
-              throw new Error(
-                `Status service returned ${response.status}`
-              );
-            }
-
-            const data = await response.json();
-            online = data.online === true;
-
-            if (online) {
-              players = data.players?.online ?? 0;
-              maxPlayers = data.players?.max ?? '?';
-            }
-          } catch (error) {
-            checkFailed = true;
-            console.error(
-              'Could not check Minecraft server:',
-              error.message
-            );
-          }
-
-          const status = checkFailed
-            ? '⚠️ Status check unavailable'
-            : online
-              ? '🟢 Online'
-              : '🔴 Offline';
-
-          // Status embed (no automatic-update footer).
-          const statusEmbed = {
-            title: '🌍 Breezes Minecraft Server',
-            color: checkFailed
-              ? 0xF1C40F
-              : online
-                ? 0x2ECC71
-                : 0xE74C3C,
-            description: `**Status:** ${status}`,
+          // Static server information. No server-status polling.
+          const infoEmbed = {
+            title: '🌍 Breezes SMP | Server Information',
+            color: 0xA18AF2,
+            description: [
+              '**☕ Java Edition**',
+              '`breezes.play.hosting`',
+              '',
+              '**🌐 Direct IP**',
+              '`216.75.75.131`',
+              '',
+              '**🎮 Version**',
+              'Minecraft Java 1.21.11 · Fabric',
+              '',
+              '**📱 Bedrock Crossplay**',
+              'Supported via Geyser and Floodgate.'
+            ].join('\n'),
             fields: [
               {
-                name: '👥 Players',
-                value: checkFailed
-                  ? 'Unknown'
-                  : `${players}/${maxPlayers}`,
-                inline: true
+                name: '🏗️ World Generation',
+                value: [
+                  '• Bigger Better End Cities — `1.1.3`',
+                  "• ChoiceTheorem's Overhauled Village — `3.6.2a`",
+                  "• Moog's Mineshafts Reimagined — `1.1.0`",
+                  "• Moog's Missing Villages — `2.2.0`",
+                  "• Moog's Nether Structures — `3.1.1`",
+                  "• Moog's Soaring Structures — `2.2.0`",
+                  "• Moog's Temples Reimagined — `2.0.4`",
+                  "• Moog's Voyager Structures — `5.1.3`",
+                  "• Moog's Structure Lib — `3.4.2`",
+                  '• Lithostitched — `1.7.2`'
+                ].join('\n'),
+                inline: false
               },
               {
-                name: '☕ Java Edition',
-                value: '1.21.11',
-                inline: true
+                name: '⚡ Performance & Networking',
+                value: [
+                  '• FerriteCore — `8.2.0`',
+                  '• Krypton — `0.2.10`',
+                  '• Lithium — `0.21.4`',
+                  '• NoisiumForked — `2.8.3`',
+                  '• ScalableLux — `0.3.0-alpha.0.3`',
+                  '• ServerCore — `1.5.15`'
+                ].join('\n'),
+                inline: false
               },
               {
-                name: '📱 Bedrock Crossplay',
-                value: 'Supported via Geyser',
-                inline: true
+                name: '🧰 Gameplay & Utility',
+                value: [
+                  '• AntiXray — `1.4.14`',
+                  '• AppleSkin — `3.0.8`',
+                  '• ReplayMod — `2.6.27`',
+                  '• ShibaGrace — `1.0.2`'
+                ].join('\n'),
+                inline: false
               },
               {
-                name: '🔗 Server Address',
-                value: `\`${address}\``,
+                name: '🎙️ Voice Chat & Community',
+                value: [
+                  '• Simple Voice Chat — `2.6.24`',
+                  '• Simple Voice Chat Discord Bridge — `3.2.1`',
+                  '• Simple Voice Chat Enhanced Groups — `1.7.1`',
+                  '• Discord Statusbot — `24.0`'
+                ].join('\n'),
+                inline: false
+              },
+              {
+                name: '🔧 Libraries & Crossplay',
+                value: [
+                  '• Fabric API — `0.141.6`',
+                  '• Cloth Config API — `21.11.153`',
+                  '• Cristel Lib — `3.1.7`',
+                  '• Floodgate — `2.2.6-b60`',
+                  '• Geyser — `2.9.6-b1133`'
+                ].join('\n'),
+                inline: false
+              },
+              {
+                name: 'ℹ️ Checking Server Status',
+                value: [
+                  'This embed does not display live server status or player counts.',
+                  '',
+                  'Check **Breeze Helper’s profile/status** to see whether the server is online and who is currently playing.'
+                ].join('\n'),
                 inline: false
               }
             ],
-            timestamp: new Date().toISOString()
+            footer: {
+              text: 'Breezes SMP.'
+            }
           };
 
-          // Update the status message, or replace it if deleted.
+          // Update the existing information message, or create it
+          // if its saved message no longer exists.
           let messageId = '';
 
           try {
@@ -153,19 +167,19 @@ jobs:
             ).trim();
           } catch {}
 
-          let statusMessage;
+          let infoMessage;
 
           if (messageId) {
             try {
-              statusMessage = await discord(
+              infoMessage = await discord(
                 'PATCH',
                 `/channels/${channelId}/messages/${messageId}`,
-                { embeds: [statusEmbed] }
+                { embeds: [infoEmbed] }
               );
 
               console.log(
-                'Updated status message:',
-                statusMessage.id
+                'Updated server information message:',
+                infoMessage.id
               );
             } catch (error) {
               if (error.status !== 404) {
@@ -173,30 +187,31 @@ jobs:
               }
 
               console.log(
-                'Old status message not found; creating a replacement.'
+                'Saved information message was deleted; creating a replacement.'
               );
             }
           }
 
-          if (!statusMessage) {
-            statusMessage = await discord(
+          if (!infoMessage) {
+            infoMessage = await discord(
               'POST',
               `/channels/${channelId}/messages`,
-              { embeds: [statusEmbed] }
+              { embeds: [infoEmbed] }
             );
 
             await writeFile(
               'message_id.txt',
-              statusMessage.id + '\n'
+              infoMessage.id + '\n'
             );
 
             console.log(
-              'Created status message:',
-              statusMessage.id
+              'Created server information message:',
+              infoMessage.id
             );
           }
 
-          // Create the rules embed only if no ID is saved.
+          // Preserve the existing rules embed.
+          // Only create it if no rules message ID is saved.
           let rulesMessageId = '';
 
           try {
@@ -252,7 +267,7 @@ jobs:
       - name: Save message IDs for future runs
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+users.noreply.github.com"
 
           git add message_id.txt rules_message_id.txt
 
